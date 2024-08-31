@@ -7,6 +7,7 @@ import streamlit as st
 import requests
 import time
 from openai import OpenAI
+from mutagen.mp3 import MP3
 
 # Constants for WebRTC VAD
 SAMPLE_RATE = 16000  # 16kHz
@@ -18,7 +19,7 @@ CHUNK = int(SAMPLE_RATE * FRAME_DURATION_MS / 1000)  # samples per frame
 # VAD parameters
 VAD_MODE = 3  # Aggressiveness mode (0-3)
 SILENT_CHUNKS = 50  # Number of silent chunks before stopping
-VOICE_CHUNKS = 2  # Number of voice chunks before starting
+VOICE_CHUNKS = 10  # Number of voice chunks before starting
 
 # Output file parameters
 WAVE_OUTPUT_FILENAME = "output.wav"
@@ -35,10 +36,16 @@ listening_text = st.empty()  # Container for displaying "Listening for speech...
 processing_text = st.empty()  # Container for displaying "Processing..." message
 
 if 'messages' not in st.session_state:
-    st.session_state["messages"] = []
+    st.session_state['messages'] = []
+
+if 'is_speaking' not in st.session_state:
+    st.session_state['is_speaking'] = False  # Flag to indicate if the assistant is speaking
 
 def record_and_transcribe():
     """Record audio and transcribe it using OpenAI's Whisper model."""
+    while st.session_state['is_speaking']:
+        time.sleep(0.1)  # Wait if the assistant is speaking
+
     stream = p.open(format=p.get_format_from_width(SAMPLE_WIDTH),
                     channels=CHANNELS,
                     rate=SAMPLE_RATE,
@@ -132,6 +139,7 @@ def record_and_transcribe():
                 st.session_state["messages"].append({"role": "assistant", "content": assistant_response})
 
                 # Convert assistant response to speech and play it
+                st.session_state['is_speaking'] = True  # Set the flag to indicate assistant is speaking
                 speech_file_path = "speech.mp3"
                 tts_response = client.audio.speech.create(
                     model="tts-1",
@@ -140,8 +148,14 @@ def record_and_transcribe():
                 )
                 tts_response.stream_to_file(speech_file_path)
 
+
+
                 # Use Streamlit audio component to autoplay the response
                 st.audio(speech_file_path, format="audio/mp3", autoplay=True)
+                mp3_audio = MP3(speech_file_path)
+                duration = mp3_audio.info.length
+                time.sleep(duration+2)
+                st.session_state['is_speaking'] = False  # Reset the flag after speaking is done
             else:
                 st.write("Assistant response not found.")
         else:
