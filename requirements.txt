@@ -1,0 +1,11 @@
+pyaudio
+wave
+webrtcvad
+streamlit
+requests
+openai
+fastapi
+resend
+pydantic
+mutagen
+
